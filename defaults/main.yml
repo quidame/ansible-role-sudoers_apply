@@ -1,0 +1,26 @@
+---
+################################################################################
+# sudoers_apply__filename
+#
+# The filename of the sudoers file to copy to, in /etc/sudoers.d . Filenames
+# containing a dot character (.) are silently ignored by sudo.
+#
+sudoers_apply__filename: sudoers_apply
+
+
+################################################################################
+# sudoers_apply__template
+#
+# Path of a template file that once evaluated is used as configuration to be
+# applied to sudoers.
+#
+sudoers_apply__template: sudoers_apply.j2
+
+
+################################################################################
+# sudoers_apply__timeout
+#
+# The delay, in seconds, after what the initial sudo configuration is restored
+# if the confirmation file is missing.
+#
+sudoers_apply__timeout: 20

@@ -1,0 +1,47 @@
+---
+# First ensure the resulting file is in good shape when making it available on
+# the remote host
+- name: build sudo configuration to be applied
+  template:
+    src: "{{ sudoers_apply__template }}"
+    dest: "/run/sudoers.apply"
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+
+# No choice. We need a shell task to run in background. `async=1` and `poll=0`
+# are mandatory parameters to ensure ansible detaches itself from the script.
+# So the next task can be played DURING this one.
+- name: apply sudoers configuration
+  shell: >
+    su -l "${SUDO_USER}" -c 'sudo -K' &&
+    (
+      set -e
+      rm -f /run/sudoers.cookie
+      test -f /etc/sudoers.d/{{ sudoers_apply__filename }} ||
+      touch /etc/sudoers.d/{{ sudoers_apply__filename }}
+      mount -o bind /run/sudoers.apply /etc/sudoers.d/{{ sudoers_apply__filename }}
+      trap 'umount /etc/sudoers.d/{{ sudoers_apply__filename }}' EXIT
+      i=0
+      while test $i -lt {{ sudoers_apply__timeout|int }}; do
+        sleep 1; i=$((i+1))
+        test -e /run/sudoers.cookie && exit 0
+      done
+      touch /run/sudoers.cookie
+    ) &
+  async: 1
+  poll: 0
+
+
+# If the cookie exists, it means initial config has been restored, and it
+# shouln't. If it doesn't exist, it means we have to create it to avoid the
+# rollback.
+- name: confirm applied configuration
+  file:
+    path: /run/sudoers.cookie
+    state: "{{ item }}"
+  register: confirm
+  failed_when: '( item == "absent" and confirm is changed ) or ( item == "touch" and confirm is not changed )'
+  with_items:
+    - absent
+    - touch
